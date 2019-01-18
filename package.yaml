@@ -24,6 +24,7 @@ dependencies:
 - text
 - purescript
 - prettyprinter
+- template-haskell
 
 library:
   source-dirs: src
