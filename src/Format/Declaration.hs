@@ -1,22 +1,41 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Format.Declaration where
 
+import           Language.PureScript.AST.Binders
 import           Language.PureScript.AST.Declarations
 import           Language.PureScript.Names
 import           Language.PureScript.Types
 
+import           Format.Expr
+
 import           Data.Text.Prettyprint.Doc
 
-import           Data.Text                            (unpack)
+import           Data.Text                            (Text, unpack)
 
 prettyDeclaration :: Declaration -> Doc ann
 prettyDeclaration (TypeDeclaration d) =
     let (i, t) = unwrapTypeDeclaration d
     in prettyTypeDeclIdent i <+>
        pretty ("::" :: String) <+>
-       prettyType t <>
-       line
-prettyDeclaration (ValueDeclaration d) = pretty ("value declaration" :: String)
+       prettyType t
+prettyDeclaration (ValueDeclaration d) =
+    prettyIdent <+> prettyBinders <+> "=" <+> prettyExpression
+  where
+    prettyIdent = pretty . showIdent . valdeclIdent $ d
+    prettyBinders = sep docs
+      where
+        bs :: [Binder]
+        bs = valdeclBinders d
+        idents :: [Ident]
+        idents = concat (binderNames <$> bs)
+        docs = pretty . showIdent <$> idents
+    prettyExpression =
+        case guardedExpr of
+            GuardedExpr [] expr -> prettyExpr expr
+            _ -> pretty ("unhandled guardedExpr" :: String)
+      where
+        guardedExprs = valdeclExpression d
+        guardedExpr  = head guardedExprs
 prettyDeclaration _ = pretty ("unhandled declaration type" :: String)
 
 prettyTypeDeclIdent :: Ident -> Doc ann

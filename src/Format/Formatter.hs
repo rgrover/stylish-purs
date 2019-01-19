@@ -11,7 +11,7 @@ import           Data.Text.Prettyprint.Doc
 import           Data.Text.Prettyprint.Doc.Render.Text
 
 import           Data.Text                               hiding (head,
-                                                          tail)
+                                                          tail, take)
 
 import           Format.Declaration
 
@@ -24,7 +24,7 @@ format s =
                 sep (pretty <$> ["module", prettyModuleName m, "where"])
                 <> line
               firstDeclaration =
-                prettyDeclaration $ head $ tail $ getModuleDeclarations m
+                vsep (prettyDeclaration <$> take 2 (getModuleDeclarations m))
               doc = header <> line <> firstDeclaration
           in unpack . renderStrict . layoutPretty defaultLayoutOptions
             $ doc
