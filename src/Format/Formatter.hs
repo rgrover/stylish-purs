@@ -24,7 +24,7 @@ format s =
                 sep (pretty <$> ["module", prettyModuleName m, "where"])
                 <> line
               firstDeclaration =
-                vsep (prettyDeclaration <$> take 2 (getModuleDeclarations m))
+                vsep (pretty <$> take 2 (getModuleDeclarations m))
               doc = header <> line <> firstDeclaration
           in unpack . renderStrict . layoutPretty defaultLayoutOptions
             $ doc
