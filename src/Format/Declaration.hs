@@ -8,6 +8,8 @@ import           Language.PureScript.Names
 import           Language.PureScript.Types
 
 import           Format.Expr
+import           Format.Ident
+import           Format.Type
 
 import           Data.Text.Prettyprint.Doc
 
@@ -39,29 +41,3 @@ instance Pretty Declaration where
             guardedExprs = valdeclExpression d
             guardedExpr = head guardedExprs
     pretty _ = pretty ("unhandled declaration type" :: String)
-
-instance Pretty Ident where
-    pretty :: Ident -> Doc ann
-    pretty (Ident t) = pretty t
-    pretty _         = error "unhandled ident"
-
-instance Pretty Type where
-    pretty :: Type -> Doc ann
-    pretty (TypeConstructor (Qualified Nothing n)) =
-        pretty $ runProperName n
-    pretty (TypeApp
-            (TypeConstructor
-                (Qualified (Just (ModuleName [ProperName "Prim"]))
-                    (ProperName "Function")))
-            (TypeConstructor
-                (Qualified Nothing (ProperName n)))) =
-                    pretty (unpack n) <+> "->"
-    pretty (TypeApp
-            t1@(TypeApp _ _)
-            (TypeConstructor
-                (Qualified Nothing (ProperName n)))) =
-                    pretty t1 <+> pretty (unpack n)
-    pretty (TypeApp t1@(TypeApp _ _) t2@(TypeApp _ _)) =
-        pretty t1 <+> pretty t2
-    pretty _ = error "unhandled type"
-
