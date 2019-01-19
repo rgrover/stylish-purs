@@ -44,9 +44,11 @@ prettyModuleName m =
 
 prettyDeclaration :: Declaration -> Doc ann
 prettyDeclaration (TypeDeclaration d) =
-    prettyTypeDeclIdent (tydeclIdent d) <+> pretty ("::" :: String) <+>
-    prettyType (tydeclType d) <>
-    line
+    let (i, t) = unwrapTypeDeclaration d
+    in prettyTypeDeclIdent i <+>
+       pretty ("::" :: String) <+>
+       prettyType t <>
+       line
 prettyDeclaration _ = pretty ("unhandled declaration type" :: String)
 
 prettyTypeDeclIdent :: Ident -> Doc ann
