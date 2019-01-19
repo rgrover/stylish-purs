@@ -31,7 +31,7 @@ prettyDeclaration (ValueDeclaration d) =
         docs = pretty . showIdent <$> idents
     prettyExpression =
         case guardedExpr of
-            GuardedExpr [] expr -> prettyExpr expr
+            GuardedExpr [] expr -> pretty expr
             _ -> pretty ("unhandled guardedExpr" :: String)
       where
         guardedExprs = valdeclExpression d
