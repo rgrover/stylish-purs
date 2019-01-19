@@ -1,7 +1,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 module Main where
 
-import           Formatter
+import           Quoter
 
 main :: IO ()
 main = do
