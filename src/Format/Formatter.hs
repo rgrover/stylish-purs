@@ -8,7 +8,9 @@ import           Language.PureScript.Parser.Declarations (parseModuleFromFile)
 import           Data.Text.Prettyprint.Doc
 import           Data.Text.Prettyprint.Doc.Render.Text
 
-import           Data.Text
+import           Data.Text                               (intercalate,
+                                                          pack,
+                                                          unpack)
 
 import           Format.Declaration
 
@@ -20,10 +22,10 @@ format s =
           let header          = prettyModuleHeader m
               decls           = getModuleDeclarations m
               declarationDocs = (pretty . ModuleDeclarations) decls
-              doc             = header <> line <> declarationDocs
+              doc             = if null decls
+                then header
+                else header <> line <> declarationDocs
           in unpack . renderStrict . layoutPretty defaultLayoutOptions $ doc
-          --in unpack . renderStrict . layoutPretty defaultLayoutOptions
-             -- $ pretty $ show m
 
 prettyModuleHeader :: Module -> Doc ann
 prettyModuleHeader m =
@@ -31,4 +33,4 @@ prettyModuleHeader m =
   where
     ModuleName nameComponents = getModuleName m
     prettyName = pretty $
-        intercalate (singleton '.') (runProperName <$> nameComponents)
+        intercalate "." (runProperName <$> nameComponents)

@@ -65,7 +65,7 @@ instance Pretty ModuleDeclarations where
       where
         lastDecl = last decls
         lastLine = sourceLine lastDecl
-        lastDoc  = pretty lastDecl
+        lastDoc  = pretty lastDecl <> line
         combine :: Declaration -> (Int, Doc ann) -> (Int, Doc ann)
         combine decl (prevLine, collectedDocs)
             | adjacentDecls = (newLine, thisDoc <> collectedDocs)
