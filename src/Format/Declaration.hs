@@ -19,24 +19,24 @@ import           Data.Text                            (Text, unpack)
 
 instance Pretty Declaration where
     pretty :: Declaration -> Doc ann
-    pretty (TypeDeclaration d) =
-        let (i, t) = unwrapTypeDeclaration d
-        in pretty i <+>
-           pretty ("::" :: String) <+> pretty t
+    pretty decl@(TypeDeclaration d) =
+        let (i, t)        = unwrapTypeDeclaration d
+            doc = pretty i <+> "::" <+> pretty t
+        in case declComments decl of
+            Nothing    -> doc
+            Just cDocs -> cDocs <> line <> doc
     pretty decl@(ValueDeclaration d) =
-        cDocs <> line <>
-            prettyIdent <+> prettyBinders <+> "=" <+> prettyExpression
+        case declComments decl of
+            Nothing    -> doc
+            Just cDocs -> cDocs <> line <> doc
       where
-        (_, comments) = declSourceAnn decl
-        cDocs = vsep (pretty <$> comments)
-        prettyIdent = pretty . showIdent . valdeclIdent $ d
-        prettyBinders = sep docs
+        prettyIdent = pretty . valdeclIdent $ d
+        prettyBinders = sep $ pretty <$> idents
           where
             bs :: [Binder]
             bs = valdeclBinders d
             idents :: [Ident]
             idents = concat (binderNames <$> bs)
-            docs = pretty . showIdent <$> idents
         prettyExpression =
             case guardedExpr of
                 GuardedExpr [] expr -> pretty expr
@@ -45,7 +45,15 @@ instance Pretty Declaration where
           where
             guardedExprs = valdeclExpression d
             guardedExpr = head guardedExprs
+        doc = prettyIdent <+> prettyBinders <+> "=" <+> prettyExpression
     pretty _ = pretty ("unhandled declaration type" :: String)
+
+declComments :: Declaration -> Maybe (Doc ann)
+declComments decl =
+    if null comments
+        then Nothing
+        else Just $ vsep (pretty <$> comments)
+  where (_, comments) = declSourceAnn decl
 
 newtype ModuleDeclarations = ModuleDeclarations [Declaration]
 
@@ -67,5 +75,3 @@ instance Pretty ModuleDeclarations where
             adjacentDecls = prevLine == (newLine + 1)
             thisDoc       = pretty decl <> line
         sourceLine = sourcePosLine . spanStart . declSourceSpan
-
-
