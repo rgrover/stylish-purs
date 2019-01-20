@@ -7,6 +7,8 @@ import           Language.PureScript.Types
 
 import           Data.Text.Prettyprint.Doc
 
+import           Format.Ident
+
 import           Data.Text                 (Text, unpack)
 
 instance Pretty Type where
@@ -17,16 +19,16 @@ instance Pretty Type where
             (TypeConstructor
                 (Qualified (Just (ModuleName [ProperName "Prim"]))
                     (ProperName "Function")))
-            (TypeConstructor
-                (Qualified Nothing (ProperName n)))) =
-                    pretty (unpack n) <+> "->"
+            (TypeConstructor qualifiedName)) =
+        pretty qualifiedName <+> "->"
     pretty (TypeApp
-            t1@(TypeApp _ _)
-            (TypeConstructor
-                (Qualified Nothing (ProperName n)))) =
-                    pretty t1 <+> pretty (unpack n)
+               (TypeConstructor qualifiedName1)
+               (TypeConstructor qualifiedName2)) =
+        pretty qualifiedName1 <+> pretty qualifiedName2
+    pretty (TypeApp t1@(TypeApp _ _) (TypeConstructor qualifiedName)) =
+        pretty t1 <+> pretty qualifiedName
     pretty (TypeApp t1@(TypeApp _ _) t2@(TypeApp _ _)) =
         pretty t1 <+> pretty t2
-    pretty _ = error "unhandled type"
+    pretty t = error ("unhandled type: " ++ show t)
 
 

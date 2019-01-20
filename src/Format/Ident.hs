@@ -10,10 +10,12 @@ instance Pretty Ident where
     pretty (Ident t) = pretty t
     pretty _         = error "unhandled ident"
 
+instance Pretty (ProperName a) where
+    pretty = pretty . runProperName
+
 instance Pretty a => Pretty (Qualified a) where
     pretty :: Qualified a -> Doc ann
     pretty (Qualified optionalModuleName i) =
         case runModuleName <$> optionalModuleName of
             Nothing         -> pretty i
             Just moduleName -> pretty moduleName <> "." <> pretty i
-
