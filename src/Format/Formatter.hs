@@ -1,8 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Format.Formatter (format) where
 
-import           Language.Haskell.TH.Syntax              (liftData)
-
 import           Language.PureScript.AST.Declarations
 import           Language.PureScript.Names
 import           Language.PureScript.Parser.Declarations (parseModuleFromFile)
@@ -10,8 +8,7 @@ import           Language.PureScript.Parser.Declarations (parseModuleFromFile)
 import           Data.Text.Prettyprint.Doc
 import           Data.Text.Prettyprint.Doc.Render.Text
 
-import           Data.Text                               hiding (head,
-                                                          tail, take)
+import           Data.Text
 
 import           Format.Declaration
 
@@ -20,17 +17,18 @@ format s =
   case parseModuleFromFile id ("_quoted", pack s) of
       Left e       -> "failed to parse input"
       Right (_, m) ->
-          let header =
-                sep (pretty <$> ["module", prettyModuleName m, "where"])
-                <> line
-              firstDeclaration =
-                vsep (pretty <$> take 2 (getModuleDeclarations m))
-              doc = header <> line <> firstDeclaration
-          in unpack . renderStrict . layoutPretty defaultLayoutOptions
-            $ doc
+          let header          = prettyModuleHeader m
+              decls           = getModuleDeclarations m
+              declarationDocs = (pretty . ModuleDeclarations) decls
+              doc             = header <> line <> declarationDocs
+          in unpack . renderStrict . layoutPretty defaultLayoutOptions $ doc
+          --in unpack . renderStrict . layoutPretty defaultLayoutOptions
+             -- $ pretty $ show m
 
-prettyModuleName :: Module -> Text
-prettyModuleName m =
-    intercalate (singleton '.') (runProperName <$> nameComponents)
+prettyModuleHeader :: Module -> Doc ann
+prettyModuleHeader m =
+    "module" <+> prettyName <+> "where" <> line
   where
     ModuleName nameComponents = getModuleName m
+    prettyName = pretty $
+        intercalate (singleton '.') (runProperName <$> nameComponents)

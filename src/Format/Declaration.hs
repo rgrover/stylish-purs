@@ -4,6 +4,7 @@ module Format.Declaration where
 
 import           Language.PureScript.AST.Binders
 import           Language.PureScript.AST.Declarations
+import           Language.PureScript.AST.SourcePos
 import           Language.PureScript.Names
 import           Language.PureScript.Types
 
@@ -45,3 +46,26 @@ instance Pretty Declaration where
             guardedExprs = valdeclExpression d
             guardedExpr = head guardedExprs
     pretty _ = pretty ("unhandled declaration type" :: String)
+
+newtype ModuleDeclarations = ModuleDeclarations [Declaration]
+
+instance Pretty ModuleDeclarations where
+    pretty :: ModuleDeclarations -> Doc ann
+    pretty (ModuleDeclarations [])    = emptyDoc
+    pretty (ModuleDeclarations decls) =
+        snd $ foldr combine (lastLine, lastDoc) $ init decls
+      where
+        lastDecl = last decls
+        lastLine = sourceLine lastDecl
+        lastDoc  = pretty lastDecl
+        combine :: Declaration -> (Int, Doc ann) -> (Int, Doc ann)
+        combine decl (prevLine, collectedDocs)
+            | adjacentDecls = (newLine, thisDoc <> collectedDocs)
+            | otherwise     = (newLine, thisDoc <> line <> collectedDocs)
+          where
+            newLine       = sourceLine decl
+            adjacentDecls = prevLine == (newLine + 1)
+            thisDoc       = pretty decl <> line
+        sourceLine = sourcePosLine . spanStart . declSourceSpan
+
+
