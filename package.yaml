@@ -50,3 +50,6 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - stylish-purs
+    - tasty
+    - tasty-hunit
+    - heredoc
