@@ -7,6 +7,7 @@ import           Language.PureScript.AST.Declarations
 import           Language.PureScript.Names
 import           Language.PureScript.Types
 
+import           Format.Comment
 import           Format.Expr
 import           Format.Ident
 import           Format.Type
@@ -21,9 +22,12 @@ instance Pretty Declaration where
         let (i, t) = unwrapTypeDeclaration d
         in pretty i <+>
            pretty ("::" :: String) <+> pretty t
-    pretty (ValueDeclaration d) =
-        prettyIdent <+> prettyBinders <+> "=" <+> prettyExpression
+    pretty decl@(ValueDeclaration d) =
+        cDocs <> line <>
+            prettyIdent <+> prettyBinders <+> "=" <+> prettyExpression
       where
+        (_, comments) = declSourceAnn decl
+        cDocs = vsep (pretty <$> comments)
         prettyIdent = pretty . showIdent . valdeclIdent $ d
         prettyBinders = sep docs
           where
