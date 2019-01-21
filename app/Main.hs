@@ -15,5 +15,5 @@ main = do
     IO.hSetEncoding IO.stderr IO.utf8
     text <- T.getContents
     case parseModuleFromFile id ("_stdin", text) of
-        Left error         -> print error >> exitFailure
+        Left error              -> print error >> exitFailure
         Right (_, parsedModule) -> T.putStr $ formatModule parsedModule
