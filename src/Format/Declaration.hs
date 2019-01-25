@@ -12,6 +12,7 @@ import           Format.Comment
 import           Format.Expr
 import           Format.Ident
 import           Format.Type
+import           Format.UnhandledError
 
 import           Data.Text.Prettyprint.Doc
 
@@ -46,7 +47,7 @@ instance Pretty Declaration where
             guardedExprs = valdeclExpression d
             guardedExpr = head guardedExprs
         doc = prettyIdent <+> prettyBinders <+> "=" <+> prettyExpression
-    pretty _ = pretty ("unhandled declaration type" :: String)
+    pretty decl = unhandledError decl
 
 declComments :: Declaration -> Maybe (Doc ann)
 declComments decl =
@@ -75,3 +76,12 @@ instance Pretty ModuleDeclarations where
             adjacentDecls = prevLine == (newLine + 1)
             thisDoc       = pretty decl <> line
         sourceLine = sourcePosLine . spanStart . declSourceSpan
+
+instance UnhandledError Declaration where
+    unhandledError d =
+        pretty ("stylish-purs: " :: String) <>
+        pretty (displaySourcePos $ spanStart $ fst $ declSourceAnn d) <+>
+        pretty ("::" :: String) <+>
+        pretty ("unhandled declaration type" :: String) <+>
+        pretty (show d)
+
