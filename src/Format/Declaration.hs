@@ -59,11 +59,22 @@ instance EitherPrettyOrErrors Declaration where
                      prettyBinders
                      prettyExpression
 
-    prettyE span decl =
-        Failure [ UnhandledError ( span
-                                 , "unhandled declaration " ++ show decl
-                                 )
-                ]
+    prettyE _ decl@(ImportDeclaration sa name typ optional) =
+        let span = fst sa
+        in Failure
+            [ UnhandledError
+                ( fst sa
+                , "unhandled import declaration " ++ show decl
+                )
+            ]
+
+    prettyE _ decl =
+        let span = fst $ declSourceAnn decl
+        in Failure
+            [ UnhandledError ( span
+                             , "unhandled declaration " ++ show decl
+                             )
+            ]
 
 declComments :: Declaration -> Maybe (Doc ann)
 declComments decl =
