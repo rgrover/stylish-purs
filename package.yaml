@@ -25,6 +25,7 @@ dependencies:
 - purescript
 - prettyprinter
 - template-haskell
+- validation
 
 library:
   source-dirs: src

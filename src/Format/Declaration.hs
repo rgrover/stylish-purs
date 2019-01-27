@@ -8,46 +8,62 @@ import           Language.PureScript.AST.SourcePos
 import           Language.PureScript.Names
 import           Language.PureScript.Types
 
+import           Format.Binder
 import           Format.Comment
 import           Format.Expr
 import           Format.Ident
 import           Format.Type
-import           Format.UnhandledError
+
+import           Data.Validation
+import           Format.EitherPrettyOrErrors
 
 import           Data.Text.Prettyprint.Doc
 
+import           Control.Applicative                  (liftA2, liftA3)
+import           Data.List                            (foldl')
 import           Data.Text                            (Text, unpack)
 
-instance Pretty Declaration where
-    pretty :: Declaration -> Doc ann
-    pretty decl@(TypeDeclaration d) =
-        let (i, t)        = unwrapTypeDeclaration d
-            doc = pretty i <+> "::" <+> pretty t
+instance EitherPrettyOrErrors Declaration where
+    prettyE :: SourceSpan -> Declaration -> Output ann
+    prettyE _ decl@(TypeDeclaration d) =
+        let (i, t) = unwrapTypeDeclaration d
+            doc    = liftA2 combine (prettyE span i) (prettyE span t)
         in case declComments decl of
             Nothing    -> doc
-            Just cDocs -> cDocs <> line <> doc
-    pretty decl@(ValueDeclaration d) =
+            Just cDocs -> (\d -> cDocs <> line <> d) <$> doc
+      where
+        span              = fst $ tydeclSourceAnn d
+        combine ident typ = ident <+> "::" <+> typ
+
+    prettyE _ decl@(ValueDeclaration d) =
         case declComments decl of
             Nothing    -> doc
-            Just cDocs -> cDocs <> line <> doc
+            Just cDocs -> (\d -> cDocs <> line <> d) <$> doc
       where
-        prettyIdent = pretty . valdeclIdent $ d
-        prettyBinders = sep $ pretty <$> idents
-          where
-            bs :: [Binder]
-            bs = valdeclBinders d
-            idents :: [Ident]
-            idents = concat (binderNames <$> bs)
+        span          = fst $ valdeclSourceAnn d
+        prettyIdent   = prettyE span . valdeclIdent $ d
+        prettyBinders = sep <$> traverse (prettyE span) (valdeclBinders d)
         prettyExpression =
             case guardedExpr of
-                GuardedExpr [] expr -> pretty expr
+                GuardedExpr [] expr -> prettyE span expr
                 _                   ->
-                    pretty ("unhandled guardedExpr" :: String)
+                    Failure
+                        [ UnhandledError
+                            ( span , "unhandled guardedExpr ")
+                        ]
           where
             guardedExprs = valdeclExpression d
-            guardedExpr = head guardedExprs
-        doc = prettyIdent <+> prettyBinders <+> "=" <+> prettyExpression
-    pretty decl = unhandledError decl
+            guardedExpr  = head guardedExprs
+        doc = liftA3 (\i binds exp -> i <+> binds <+> "=" <+> exp)
+                     prettyIdent
+                     prettyBinders
+                     prettyExpression
+
+    prettyE span decl =
+        Failure [ UnhandledError ( span
+                                 , "unhandled declaration " ++ show decl
+                                 )
+                ]
 
 declComments :: Declaration -> Maybe (Doc ann)
 declComments decl =
@@ -58,30 +74,33 @@ declComments decl =
 
 newtype ModuleDeclarations = ModuleDeclarations [Declaration]
 
-instance Pretty ModuleDeclarations where
-    pretty :: ModuleDeclarations -> Doc ann
-    pretty (ModuleDeclarations [])    = emptyDoc
-    pretty (ModuleDeclarations decls) =
-        snd $ foldr combine (lastLine, lastDoc) $ init decls
+instance EitherPrettyOrErrors ModuleDeclarations where
+    prettyE :: SourceSpan -> ModuleDeclarations -> Output ann
+    prettyE span (ModuleDeclarations decls) = joinDocsForDecls decls
       where
-        lastDecl = last decls
-        lastLine = sourceLine lastDecl
-        lastDoc  = pretty lastDecl <> line
-        combine :: Declaration -> (Int, Doc ann) -> (Int, Doc ann)
-        combine decl (prevLine, collectedDocs)
-            | adjacentDecls = (newLine, thisDoc <> collectedDocs)
-            | otherwise     = (newLine, thisDoc <> line <> collectedDocs)
+        joinDocsForDecls :: [Declaration] -> Output ann
+        joinDocsForDecls [] = Success emptyDoc
+        joinDocsForDecls decls =
+            snd $ foldl' combine (firstLine, firstDoc) decls
           where
-            newLine       = sourceLine decl
-            adjacentDecls = prevLine == (newLine + 1)
-            thisDoc       = pretty decl <> line
-        sourceLine = sourcePosLine . spanStart . declSourceSpan
+            firstDecl = head decls
+            firstLine = sourceLine firstDecl
+            firstDoc = prettyE span firstDecl
+            combine :: (Int, Output ann)
+                    -> Declaration
+                    -> (Int, Output ann)
+            combine (prevLine, collectedDocs) decl
+                | siblingDecls = ( newLine
+                                 , liftA2 (<>) collectedDocs thisDoc
+                                 )
+                | otherwise    = ( newLine
+                                 , liftA2
+                                       (\coll this -> coll <> line <> this)
+                                       collectedDocs thisDoc
+                                 )
+                where
+                    newLine      = sourceLine decl
+                    siblingDecls = prevLine == newLine
+                    thisDoc      = prettyE span decl
 
-instance UnhandledError Declaration where
-    unhandledError d =
-        pretty ("stylish-purs: " :: String) <>
-        pretty (displaySourcePos $ spanStart $ fst $ declSourceAnn d) <+>
-        pretty ("::" :: String) <+>
-        pretty ("unhandled declaration type" :: String) <+>
-        pretty (show d)
-
+            sourceLine = sourcePosLine . spanStart . declSourceSpan

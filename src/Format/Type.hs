@@ -2,33 +2,48 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Format.Type where
 
+import           Language.PureScript.AST.SourcePos
 import           Language.PureScript.Names
 import           Language.PureScript.Types
 
 import           Data.Text.Prettyprint.Doc
 
+import           Format.EitherPrettyOrErrors
 import           Format.Ident
 
-import           Data.Text                 (Text, unpack)
+import           Data.Validation
 
-instance Pretty Type where
-    pretty :: Type -> Doc ann
-    pretty (TypeConstructor (Qualified Nothing n)) =
-        pretty $ runProperName n
-    pretty (TypeApp
-            (TypeConstructor
-                (Qualified (Just (ModuleName [ProperName "Prim"]))
-                    (ProperName "Function")))
+import           Control.Applicative
+import           Data.Text                         (Text, unpack)
+
+instance EitherPrettyOrErrors Type where
+    prettyE :: SourceSpan -> Type -> Output ann
+    prettyE _ (TypeConstructor (Qualified Nothing n)) =
+        Success $ pretty $ runProperName n
+    prettyE span
+            (TypeApp
+                (TypeConstructor
+                    (Qualified
+                        (Just (ModuleName [ProperName "Prim"]))
+                        (ProperName "Function")))
             (TypeConstructor qualifiedName)) =
-        pretty qualifiedName <+> "->"
-    pretty (TypeApp
-               (TypeConstructor qualifiedName1)
-               (TypeConstructor qualifiedName2)) =
-        pretty qualifiedName1 <+> pretty qualifiedName2
-    pretty (TypeApp t1@(TypeApp _ _) (TypeConstructor qualifiedName)) =
-        pretty t1 <+> pretty qualifiedName
-    pretty (TypeApp t1@(TypeApp _ _) t2@(TypeApp _ _)) =
-        pretty t1 <+> pretty t2
-    pretty t = error ("unhandled type: " ++ show t)
+        (<+> "->") <$> prettyE span qualifiedName
 
+    prettyE span
+            (TypeApp
+                (TypeConstructor qualifiedName1)
+                (TypeConstructor qualifiedName2)) =
+        liftA2 (<+>)
+               (prettyE span qualifiedName1)
+               (prettyE span qualifiedName2)
 
+    prettyE span
+            (TypeApp t1@(TypeApp _ _)
+            (TypeConstructor qualifiedName)) =
+        liftA2 (<+>) (prettyE span t1) (prettyE span qualifiedName)
+
+    prettyE span (TypeApp t1@(TypeApp _ _) t2@(TypeApp _ _)) =
+        liftA2 (<+>) (prettyE span t1) (prettyE span t2)
+
+    prettyE span t =
+        Failure [UnhandledError (span, "unhandled type: " ++ show t)]

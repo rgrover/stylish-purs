@@ -2,20 +2,28 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Format.Ident where
 
-import           Data.Text.Prettyprint.Doc
+import           Language.PureScript.AST.SourcePos
 import           Language.PureScript.Names
 
-instance Pretty Ident where
-    pretty :: Ident -> Doc ann
-    pretty (Ident t) = pretty t
-    pretty _         = error "unhandled ident"
+import           Data.Validation
+import           Format.EitherPrettyOrErrors
 
-instance Pretty (ProperName a) where
-    pretty = pretty . runProperName
+import           Data.Text.Prettyprint.Doc
 
-instance Pretty a => Pretty (Qualified a) where
-    pretty :: Qualified a -> Doc ann
-    pretty (Qualified optionalModuleName i) =
+instance EitherPrettyOrErrors Ident where
+    prettyE :: SourceSpan -> Ident -> Output ann
+    prettyE _ (Ident t) = Success $ pretty t
+    prettyE span i      =
+        Failure [UnhandledError (span, "unhandled ident " ++ show i)]
+
+instance EitherPrettyOrErrors (ProperName a) where
+    prettyE _ = Success . pretty . runProperName
+
+instance EitherPrettyOrErrors a =>
+         EitherPrettyOrErrors (Qualified a) where
+    prettyE :: SourceSpan -> Qualified a -> Output ann
+    prettyE span (Qualified optionalModuleName i) =
         case runModuleName <$> optionalModuleName of
-            Nothing         -> pretty i
-            Just moduleName -> pretty moduleName <> "." <> pretty i
+            Nothing         -> prettyE span i
+            Just moduleName -> let m = pretty moduleName <> "."
+                               in (m <>) <$> prettyE span i
