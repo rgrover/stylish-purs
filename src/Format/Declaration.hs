@@ -36,14 +36,13 @@ instance EitherPrettyOrErrors Declaration where
         span              = fst $ tydeclSourceAnn d
         combine ident typ = ident <+> "::" <+> typ
 
-    prettyE _ decl@(ValueDeclaration d) =
-        case declComments decl of
-            Nothing    -> doc
-            Just cDocs -> (\d -> cDocs <> line <> d) <$> doc
+    prettyE _ decl@(ValueDeclaration d) = docWithComments
       where
         span          = fst $ valdeclSourceAnn d
         prettyIdent   = prettyE span . valdeclIdent $ d
-        prettyBinders = sep <$> traverse (prettyE span) (valdeclBinders d)
+        prettyBinders =
+            sep <$> traverse (prettyE span) (valdeclBinders d)
+        bindersAbsent = null $ valdeclBinders d
         prettyExpression =
             case guardedExpr of
                 GuardedExpr [] expr -> prettyE span expr
@@ -55,10 +54,18 @@ instance EitherPrettyOrErrors Declaration where
           where
             guardedExprs = valdeclExpression d
             guardedExpr  = head guardedExprs
-        doc = liftA3 (\i binds exp -> i <+> binds <+> "=" <+> exp)
-                     prettyIdent
-                     prettyBinders
-                     prettyExpression
+        doc = if bindersAbsent
+                  then liftA2 (\i exp -> i <+> "=" <+> exp)
+                              prettyIdent
+                              prettyExpression
+                  else liftA3 (\i bs exp -> i <+> bs <+> "=" <+> exp)
+                              prettyIdent
+                              prettyBinders
+                              prettyExpression
+        docWithComments =
+            case declComments decl of
+                Nothing    -> doc
+                Just cDocs -> (\d -> cDocs <> line <> d) <$> doc
 
     prettyE _ decl@(ImportDeclaration sa name typ optional) =
         let span          = fst sa
