@@ -33,12 +33,12 @@ format s =
                 output
 
 formatModule :: Module -> Output ann
-formatModule parsedModule = addHeader <$> declarationDocs
+formatModule parsedModule = combine <$> declarationDocs
   where header          = prettyModuleHeader parsedModule
         ds              = getModuleDeclarations parsedModule
         declarationDocs = (prettyE moduleSpan . ModuleDeclarations) ds
         moduleSpan      = getModuleSourceSpan parsedModule
-        addHeader docs  = header <> line <> docs
+        combine docs    = header <> line <> docs <> line
 
 prettyModuleHeader :: Module -> Doc ann
 prettyModuleHeader parsedModule =

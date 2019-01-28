@@ -21,6 +21,7 @@ import           Data.Text.Prettyprint.Doc
 
 import           Control.Applicative                  (liftA2, liftA3)
 import           Data.List                            (foldl')
+import           Data.Maybe                           (isJust)
 import           Data.Text                            (Text, unpack)
 
 instance EitherPrettyOrErrors Declaration where
@@ -60,13 +61,35 @@ instance EitherPrettyOrErrors Declaration where
                      prettyExpression
 
     prettyE _ decl@(ImportDeclaration sa name typ optional) =
-        let span = fst sa
-        in Failure
-            [ UnhandledError
-                ( fst sa
-                , "unhandled import declaration " ++ show decl
-                )
-            ]
+        let span          = fst sa
+            prettyName    = pretty name
+            qualifiedName = case optional of
+                Nothing -> Success emptyDoc
+                Just q  -> Success $ "as" <+> pretty q
+            rootImport = Success $ "import" <+> prettyName
+        in case typ of
+                Implicit -> if isJust optional
+                                then liftA2 (<+>) rootImport qualifiedName
+                                else rootImport
+                Explicit drefs ->
+                    let refFmts  = traverse (prettyE span) drefs
+                        foldrefs = encloseSep lparen
+                                              rparen
+                                              (comma <> space)
+                        formattedRefs = foldrefs <$> refFmts
+                        rootAndRefs   = liftA2 (<+>)
+                                               rootImport
+                                               formattedRefs
+                    in if isJust optional
+                            then liftA2 (<+>) rootAndRefs qualifiedName
+                            else rootAndRefs
+                _ -> Failure
+                        [ UnhandledError
+                            ( span
+                            , "unhandled import declaration for "
+                                ++ show prettyName
+                            )
+                        ]
 
     prettyE _ decl =
         let span = fst $ declSourceAnn decl
@@ -83,6 +106,17 @@ declComments decl =
         else Just $ vsep (pretty <$> comments)
   where (_, comments) = declSourceAnn decl
 
+instance EitherPrettyOrErrors DeclarationRef where
+    prettyE _ (ValueRef span i) = prettyE span i
+    prettyE _ (TypeRef span pname Nothing) = prettyE span pname
+    prettyE _ (TypeRef span pname (Just [])) = prettyE span pname
+    prettyE _ ref =
+        Failure
+            [ UnhandledError ( declRefSourceSpan ref
+                            , "unhandled declarationRef " ++ show ref
+                            )
+            ]
+
 newtype ModuleDeclarations = ModuleDeclarations [Declaration]
 
 instance EitherPrettyOrErrors ModuleDeclarations where
@@ -92,7 +126,7 @@ instance EitherPrettyOrErrors ModuleDeclarations where
         joinDocsForDecls :: [Declaration] -> Output ann
         joinDocsForDecls [] = Success emptyDoc
         joinDocsForDecls decls =
-            snd $ foldl' combine (firstLine, firstDoc) decls
+            snd $ foldl' combine (firstLine, firstDoc) $ tail decls
           where
             firstDecl = head decls
             firstLine = sourceLine firstDecl
@@ -101,17 +135,23 @@ instance EitherPrettyOrErrors ModuleDeclarations where
                     -> Declaration
                     -> (Int, Output ann)
             combine (prevLine, collectedDocs) decl
-                | siblingDecls = ( newLine
+                | siblingDecls = ( nextLine
                                  , liftA2 (<>) collectedDocs thisDoc
                                  )
-                | otherwise    = ( newLine
+                | adjacentDecls = ( nextLine
                                  , liftA2
-                                       (\coll this -> coll <> line <> this)
+                                        (\coll this -> coll <> line <> this)
+                                        collectedDocs thisDoc
+                                 )
+                | otherwise    = ( nextLine
+                                 , liftA2
+                                       (\coll this -> coll <> line <> line <> this)
                                        collectedDocs thisDoc
                                  )
                 where
-                    newLine      = sourceLine decl
-                    siblingDecls = prevLine == newLine
-                    thisDoc      = prettyE span decl
+                    nextLine      = sourceLine decl
+                    siblingDecls  = prevLine == nextLine
+                    adjacentDecls = (prevLine + 1) == nextLine
+                    thisDoc       = prettyE span decl
 
             sourceLine = sourcePosLine . spanStart . declSourceSpan

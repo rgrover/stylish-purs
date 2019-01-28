@@ -19,11 +19,14 @@ instance EitherPrettyOrErrors Ident where
 instance EitherPrettyOrErrors (ProperName a) where
     prettyE _ = Success . pretty . runProperName
 
+instance Pretty ModuleName where
+    pretty = pretty . runModuleName
+
 instance EitherPrettyOrErrors a =>
          EitherPrettyOrErrors (Qualified a) where
     prettyE :: SourceSpan -> Qualified a -> Output ann
-    prettyE span (Qualified optionalModuleName i) =
-        case runModuleName <$> optionalModuleName of
-            Nothing         -> prettyE span i
-            Just moduleName -> let m = pretty moduleName <> "."
-                               in (m <>) <$> prettyE span i
+    prettyE span (Qualified optionalModuleName ident) =
+        case pretty <$> optionalModuleName of
+            Nothing         -> prettyE span ident
+            Just doc -> let prefix = doc <> "."
+                        in (prefix <>) <$> prettyE span ident
