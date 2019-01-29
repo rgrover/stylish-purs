@@ -117,6 +117,8 @@ instance EitherPrettyOrErrors DeclarationRef where
     prettyE _ (ValueRef span i) = prettyE span i
     prettyE _ (TypeRef span pname Nothing) = prettyE span pname
     prettyE _ (TypeRef span pname (Just [])) = prettyE span pname
+    prettyE _ (ValueOpRef span opname) =
+        enclose lparen rparen <$> prettyE span opname
     prettyE _ ref =
         Failure
             [ UnhandledError ( declRefSourceSpan ref
